@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criativalia Control Plane — Autonomous</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #0a0a0b; color: #fafafa; }
+        .card { background: #141414; border: 1px solid #2a2a2a; border-radius: 12px; }
+        .btn-primary { background: #c17767; color: white; }
+        .btn-primary:hover { background: #d48877; }
+        .status-idle { color: #888; }
+        .status-running { color: #7a9e7e; }
+        .status-proposed { color: #d4a373; }
+        .priority-p0 { border-left: 3px solid #c17767; }
+        .priority-p1 { border-left: 3px solid #d4a373; }
+        .priority-p2 { border-left: 3px solid #4a5568; }
+        .log-debug { color: #888; }
+        .log-info { color: #fafafa; }
+        .log-warning { color: #d4a373; }
+        .log-error { color: #c17767; }
+        .agent-card { transition: all 0.2s; }
+        .agent-card:hover { border-color: #c17767; }
+        .backlog-item { transition: all 0.2s; }
+        .backlog-item:hover { background: #1a1a1a; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <header class="border-b border-gray-800 bg-gray-900/50 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
+                    <i class="fas fa-rocket text-white"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg">Criativalia Control Plane</h1>
+                    <p class="text-xs text-gray-400">Autonomous Multi-Agent System v2.0</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 text-sm bg-gray-800 px-3 py-1 rounded-lg">
+                    <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                    <span id="autonomous-status">Autonomous: ON</span>
+                </div>
+                <button onclick="toggleAutonomous()" id="auto-toggle" class="px-3 py-1 rounded-lg bg-red-600/20 text-red-400 text-sm hover:bg-red-600/30">
+                    Desativar
+                </button>
+                <button onclick="refreshData()" class="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-6">
+        <!-- Stats Row -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div class="card p-4">
+                <p class="text-xs text-gray-500 uppercase">Backlog</p>
+                <p class="text-2xl font-bold" id="stat-backlog">0</p>
+            </div>
+            <div class="card p-4">
+                <p class="text-xs text-gray-500 uppercase">Priorizados</p>
+                <p class="text-2xl font-bold text-c17767" id="stat-prioritized">0</p>
+            </div>
+            <div class="card p-4">
+                <p class="text-xs text-gray-500 uppercase">Em Execução</p>
+                <p class="text-2xl font-bold text-green-400" id="stat-executing">0</p>
+            </div>
+            <div class="card p-4">
+                <p class="text-xs text-gray-500 uppercase">Oportunidades</p>
+                <p class="text-2xl font-bold text-yellow-400" id="stat-opportunities">0</p>
+            </div>
+            <div class="card p-4">
+                <p class="text-xs text-gray-500 uppercase">Concluídos Hoje</p>
+                <p class="text-2xl font-bold" id="stat-completed">0</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Main: Backlog Priorizado -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Backlog do Orchestrator -->
+                <div class="card p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="font-semibold flex items-center gap-2">
+                            <i class="fas fa-crown text-c17767"></i>
+                            Backlog Priorizado (CEO_ORCHESTRATOR)
+                        </h2>
+                        <div class="flex gap-2">
+                            <button onclick="runPrioritization()" class="px-3 py-1 rounded bg-c17767/20 text-c17767 text-sm hover:bg-c17767/30">
+                                <i class="fas fa-sort-amount-down mr-1"></i>Re-priorizar
+                            </button>
+                        </div>
+                    </div>
+                    <div id="backlog-list" class="space-y-2">
+                        <!-- Backlog items here -->
+                    </div>
+                </div>
+
+                <!-- Propostas de Agentes -->
+                <div class="card p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="font-semibold flex items-center gap-2">
+                            <i class="fas fa-lightbulb text-yellow-500"></i>
+                            Propostas de Agentes (Oportunidades)
+                        </h2>
+                        <button onclick="simulateOpportunityDiscovery()" class="px-3 py-1 rounded bg-yellow-600/20 text-yellow-400 text-sm hover:bg-yellow-600/30">
+                            <i class="fas fa-search mr-1"></i>Buscar Oportunidades
+                        </button>
+                    </div>
+                    <div id="proposals-list" class="space-y-2">
+                        <!-- Proposals here -->
+                    </div>
+                </div>
+
+                <!-- Tarefas em Execução -->
+                <div class="card p-6">
+                    <h2 class="font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-spinner text-green-400"></i>
+                        Em Execução
+                    </h2>
+                    <div id="executing-list" class="space-y-2">
+                        <!-- Executing tasks here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar: Agentes & Controles -->
+            <div class="space-y-6">
+                <!-- Status dos Agentes -->
+                <div class="card p-6">
+                    <h2 class="font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-robot text-c17767"></i>
+                        Agentes
+                    </h2>
+                    <div id="agents-list" class="space-y-3">
+                        <!-- Agent status here -->
+                    </div>
+                </div>
+
+                <!-- Criar Tarefa Manual -->
+                <div class="card p-6">
+                    <h2 class="font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-plus-circle text-c17767"></i>
+                        Nova Tarefa
+                    </h2>
+                    <form id="task-form" class="space-y-3">
+                        <select id="task-agent" class="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 text-sm">
+                            <option value="">Selecionar Agente...</option>
+                        </select>
+                        <input type="text" id="task-title" placeholder="Título da tarefa..." 
+                            class="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 text-sm">
+                        <textarea id="task-desc" placeholder="Descrição detalhada..." rows="3"
+                            class="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 text-sm"></textarea>
+                        
+                        <select id="task-priority" class="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 text-sm">
+                            <option value="p0">🔴 P0 - Crítico (Revenue)</option>
+                            <option value="p1">🟡 P1 - Alto (Growth)</option>
+                            <option value="p2" selected>⚪ P2 - Normal (Improvement)</option>
+                        </select>
+                        
+                        <button type="button" onclick="createManualTask()" class="w-full btn-primary py-2 rounded-lg font-medium">
+                            Criar Tarefa
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Live Logs -->
+                <div class="card p-6">
+                    <h2 class="font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-terminal text-c17767"></i>
+                        Runtime Logs
+                    </h2>
+                    <div id="logs-container" class="h-48 overflow-y-auto space-y-1 text-xs font-mono bg-gray-950 p-3 rounded-lg">
+                        <!-- Logs here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Proposal Review Modal -->
+    <div id="proposal-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div class="card max-w-2xl w-full p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold">Revisar Proposta</h3>
+                <button onclick="closeProposalModal()" class="p-2 hover:bg-gray-800 rounded-lg">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="proposal-content" class="space-y-4"></div>
+            <div class="flex gap-3 mt-6">
+                <button onclick="approveProposal('p0')" class="flex-1 py-2 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30">
+                    🔴 P0 - Crítico
+                </button>
+                <button onclick="approveProposal('p1')" class="flex-1 py-2 rounded-lg bg-yellow-600/20 text-yellow-400 hover:bg-yellow-600/30">
+                    🟡 P1 - Alto
+                </button>
+                <button onclick="approveProposal('p2')" class="flex-1 py-2 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600">
+                    ⚪ P2 - Normal
+                </button>
+                <button onclick="rejectProposal()" class="flex-1 py-2 rounded-lg bg-red-900/50 text-red-400 hover:bg-red-900/70">
+                    ❌ Rejeitar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Agent definitions with opportunity detection capabilities
+        const AGENT_DEFINITIONS = [
+            {
+                id: 'ceo_orchestrator',
+                name: 'CEO_ORCHESTRATOR',
+                role: 'Orquestrador / Priorizador',
+                description: 'Orquestra todos os agentes, define prioridades, gerencia backlog',
+                skills: ['strategy', 'prioritization', 'coordination'],
+                config: { priority: 10, can_propose: false, must_approve: true },
+                opportunity_areas: []
+            },
+            {
+                id: 'traffic_manager',
+                name: 'TRAFFIC_MANAGER',
+                role: 'Gestor de Tráfego',
+                description: 'Meta Ads, Google Ads, otimização de ROAS',
+                skills: ['meta_ads', 'google_ads', 'analytics'],
+                config: { priority: 9, can_propose: true },
+                opportunity_areas: ['campanhas_inativas', 'criativos_novos', 'segmentacao', 'retargeting']
+            },
+            {
+                id: 'shopify_specialist',
+                name: 'SHOPIFY_SPECIALIST',
+                role: 'Especialista Shopify',
+                description: 'Otimização de loja, produtos, checkout',
+                skills: ['shopify_api', 'ecommerce', 'seo'],
+                config: { priority: 8, can_propose: true },
+                opportunity_areas: ['produtos_sem_foto', 'descricoes_seo', 'upsell', 'abandono_carrinho']
+            },
+            {
+                id: 'copywriter',
+                name: 'COPYWRITER',
+                role: 'Copywriter',
+                description: 'Copy para ads, produtos, emails',
+                skills: ['copywriting', 'email_marketing'],
+                config: { priority: 7, can_propose: true },
+                opportunity_areas: ['produtos_sem_descricao', 'emails_automaticos', 'social_media', 'blog']
+            },
+            {
+                id: 'designer',
+                name: 'DESIGNER',
+                role: 'Designer',
+                description: 'Visuais, mockups, assets',
+                skills: ['graphic_design', 'ui_design'],
+                config: { priority: 7, can_propose: true },
+                opportunity_areas: ['produtos_sem_mockup', 'banners', 'social_media', 'packaging']
+            },
+            {
+                id: 'dev_automation',
+                name: 'DEV_AUTOMATION_AI',
+                role: 'Dev / Automação',
+                description: 'Scripts, integrações, automações',
+                skills: ['javascript', 'python', 'automation'],
+                config: { priority: 8, can_propose: true },
+                opportunity_areas: ['automacao_manual', 'relatorios', 'integracoes', 'webhooks']
+            },
+            {
+                id: 'data_analyst',
+                name: 'DATA_ANALYST',
+                role: 'Analista de Dados',
+                description: 'Métricas, relatórios, insights',
+                skills: ['analytics', 'reporting'],
+                config: { priority: 6, can_propose: true },
+                opportunity_areas: ['metricas_desatualizadas', 'anomalias', 'benchmarking', 'forecast']
+            },
+            {
+                id: 'executor',
+                name: 'EXECUTOR',
+                role: 'Executor',
+                description: 'Execução rápida de tarefas',
+                skills: ['execution', 'validation'],
+                config: { priority: 5, can_propose: false },
+                opportunity_areas: []
+            }
+        ];
+
+        // Opportunity templates by agent
+        const OPPORTUNITY_TEMPLATES = {
+            traffic_manager: [
+                { title: 'Criar nova campanha de retargeting', impact: 'high', effort: 'medium', reason: 'Clientes que visitaram mas não compraram' },
+                { title: 'Testar 3 novos criativos para campanha ativa', impact: 'medium', effort: 'low', reason: 'Creative fatigue detectado' },
+                { title: 'Otimizar segmentação de lookalike', impact: 'high', effort: 'medium', reason: 'Aumentar ROAS em 20%' }
+            ],
+            shopify_specialist: [
+                { title: 'Revisar e otimizar checkout', impact: 'high', effort: 'medium', reason: 'Reduzir abandono de carrinho' },
+                { title: 'Criar upsell de produtos relacionados', impact: 'medium', effort: 'low', reason: 'Aumentar ticket médio' },
+                { title: 'Atualizar SEO de 10 produtos', impact: 'medium', effort: 'medium', reason: 'Melhorar indexação Google' }
+            ],
+            copywriter: [
+                { title: 'Escrever copy para 5 produtos sem descrição', impact: 'medium', effort: 'medium', reason: 'Aumentar conversão' },
+                { title: 'Criar sequência de emails de boas-vindas', impact: 'high', effort: 'medium', reason: 'Aumentar retenção' },
+                { title: 'Gerar 10 ideias de posts para Instagram', impact: 'low', effort: 'low', reason: 'Manter presença social' }
+            ],
+            designer: [
+                { title: 'Criar mockups para 8 produtos', impact: 'medium', effort: 'high', reason: 'Melhorar apresentação visual' },
+                { title: 'Redesenhar banner da homepage', impact: 'medium', effort: 'medium', reason: 'Destacar promoção atual' },
+                { title: 'Criar templates para Stories', impact: 'low', effort: 'medium', reason: 'Agilizar posts sociais' }
+            ],
+            dev_automation: [
+                { title: 'Automatizar relatório diário de vendas', impact: 'high', effort: 'medium', reason: 'Economizar 30min/dia' },
+                { title: 'Criar webhook para notificações', impact: 'medium', effort: 'low', reason: 'Alertas em tempo real' },
+                { title: 'Integrar Shopify com planilha', impact: 'low', effort: 'medium', reason: 'Backup automático' }
+            ],
+            data_analyst: [
+                { title: 'Análise de cohort de clientes', impact: 'high', effort: 'high', reason: 'Entender retenção' },
+                { title: 'Benchmark de preços com concorrentes', impact: 'medium', effort: 'medium', reason: 'Posicionamento competitivo' },
+                { title: 'Forecast de vendas próximos 30 dias', impact: 'medium', effort: 'medium', reason: 'Planejamento de estoque' }
+            ]
+        };
+
+        // Data storage
+        let agents = JSON.parse(localStorage.getItem('cp_agents')) || JSON.parse(JSON.stringify(AGENT_DEFINITIONS));
+        let backlog = JSON.parse(localStorage.getItem('cp_backlog')) || [];
+        let proposals = JSON.parse(localStorage.getItem('cp_proposals')) || [];
+        let executing = JSON.parse(localStorage.getItem('cp_executing')) || [];
+        let completed = JSON.parse(localStorage.getItem('cp_completed')) || [];
+        let logs = JSON.parse(localStorage.getItem('cp_logs')) || [];
+        let autonomousMode = JSON.parse(localStorage.getItem('cp_autonomous')) ?? true;
+        let currentProposalId = null;
+
+        function saveData() {
+            localStorage.setItem('cp_agents', JSON.stringify(agents));
+            localStorage.setItem('cp_backlog', JSON.stringify(backlog));
+            localStorage.setItem('cp_proposals', JSON.stringify(proposals));
+            localStorage.setItem('cp_executing', JSON.stringify(executing));
+            localStorage.setItem('cp_completed', JSON.stringify(completed));
+            localStorage.setItem('cp_logs', JSON.stringify(logs));
+            localStorage.setItem('cp_autonomous', JSON.stringify(autonomousMode));
+        }
+
+        function init() {
+            renderAgents();
+            renderBacklog();
+            renderProposals();
+            renderExecuting();
+            renderStats();
+            populateAgentSelect();
+            updateAutonomousStatus();
+            addLog('info', 'Control Plane v2.0 initialized - Autonomous mode: ' + (autonomousMode ? 'ON' : 'OFF'));
+            
+            // Autonomous loop
+            if (autonomousMode) {
+                setInterval(runAutonomousCycle, 10000); // Every 10 seconds
+                setInterval(simulateOpportunityDiscovery, 60000); // Every minute
+            }
+        }
+
+        // ========== AUTONOMOUS SYSTEM ==========
+
+        function runAutonomousCycle() {
+            if (!autonomousMode) return;
+            
+            // 1. Check for idle agents with work in backlog
+            const idleAgents = agents.filter(a => a.id !== 'ceo_orchestrator' && a.config.can_propose && !isAgentBusy(a.id));
+            
+            idleAgents.forEach(agent => {
+                const agentTasks = backlog.filter(t => t.agent_id === agent.id && t.status === 'pending');
+                if (agentTasks.length > 0) {
+                    // Take highest priority task
+                    const task = agentTasks.sort((a, b) => priorityWeight(a.priority) - priorityWeight(b.priority))[0];
+                    startTaskExecution(task);
+                }
+            });
+            
+            // 2. Orchestrator reviews proposals
+            const pendingProposals = proposals.filter(p => p.status === 'pending');
+            if (pendingProposals.length > 0 && !isAgentBusy('ceo_orchestrator')) {
+                autoPrioritizeProposals();
+            }
+            
+            renderStats();
+        }
+
+        function isAgentBusy(agentId) {
+            return executing.some(t => t.agent_id === agentId);
+        }
+
+        function priorityWeight(p) {
+            const weights = { p0: 0, p1: 1, p2: 2 };
+            return weights[p] || 2;
+        }
+
+        function simulateOpportunityDiscovery() {
+            if (!autonomousMode) return;
+            
+            const proposingAgents = agents.filter(a => a.config.can_propose && !isAgentBusy(a.id) && Math.random() > 0.7);
+            
+            proposingAgents.forEach(agent => {
+                const templates = OPPORTUNITY_TEMPLATES[agent.id] || [];
+                if (templates.length > 0) {
+                    const template = templates[Math.floor(Math.random() * templates.length)];
+                    
+                    const proposal = {
+                        id: 'prop_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                        agent_id: agent.id,
+                        agent_name: agent.name,
+                        title: template.title,
+                        description: template.reason,
+                        impact: template.impact,
+                        effort: template.effort,
+                        estimated_value: estimateValue(template.impact),
+                        status: 'pending',
+                        created_at: new Date().toISOString()
+                    };
+                    
+                    proposals.push(proposal);
+                    addLog('info', `${agent.name} proposed: ${template.title}`);
+                }
+            });
+            
+            saveData();
+            renderProposals();
+            renderStats();
+        }
+
+        function estimateValue(impact) {
+            const values = { high: 'R$ 500-2000/mês', medium: 'R$ 100-500/mês', low: 'R$ 50-100/mês' };
+            return values[impact] || 'Indefinido';
+        }
+
+        function autoPrioritizeProposals() {
+            // CEO_ORCHESTRATOR automatically prioritizes based on impact
+            const toProcess = proposals.filter(p => p.status === 'pending').slice(0, 3);
+            
+            toProcess.forEach(prop => {
+                let priority = 'p2';
+                if (prop.impact === 'high' && prop.effort === 'low') priority = 'p0';
+                else if (prop.impact === 'high') priority = 'p1';
+                else if (prop.impact === 'medium' && prop.effort === 'low') priority = 'p1';
+                
+                approveProposalByOrchestrator(prop.id, priority);
+            });
+        }
+
+        function approveProposalByOrchestrator(proposalId, priority) {
+            const proposal = proposals.find(p => p.id === proposalId);
+            if (!proposal) return;
+            
+            proposal.status = 'approved';
+            proposal.priority = priority;
+            
+            // Move to backlog as task
+            const task = {
+                id: 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                agent_id: proposal.agent_id,
+                title: proposal.title,
+                description: proposal.description,
+                priority: priority,
+                status: 'pending',
+                source: 'opportunity',
+                estimated_value: proposal.estimated_value,
+                created_at: new Date().toISOString()
+            };
+            
+            backlog.push(task);
+            addLog('info', `CEO_ORCHESTRATOR approved: ${proposal.title} as ${priority}`);
+            
+            saveData();
+            renderBacklog();
+            renderProposals();
+            renderStats();
+        }
+
+        function startTaskExecution(task) {
+            task.status = 'in_progress';
+            task.started_at = new Date().toISOString();
+            
+            const execTask = {
+                ...task,
+                progress: 0
+            };
+            
+            executing.push(execTask);
+            
+            // Remove from backlog
+            const idx = backlog.findIndex(t => t.id === task.id);
+            if (idx > -1) backlog.splice(idx, 1);
+            
+            addLog('info', `${task.agent_id} started: ${task.title}`);
+            
+            // Simulate execution progress
+            simulateExecution(execTask);
+            
+            saveData();
+            renderBacklog();
+            renderExecuting();
+            renderStats();
+        }
+
+        function simulateExecution(task) {
+            const interval = setInterval(() => {
+                task.progress += 10;
+                
+                if (task.progress >= 100) {
+                    clearInterval(interval);
+                    completeTask(task);
+                }
+                
+                saveData();
+                renderExecuting();
+            }, 2000);
+        }
+
+        function completeTask(task) {
+            task.status = 'completed';
+            task.completed_at = new Date().toISOString();
+            
+            const idx = executing.findIndex(t => t.id === task.id);
+            if (idx > -1) executing.splice(idx, 1);
+            
+            completed.push(task);
+            
+            addLog('info', `✅ Completed: ${task.title}`);
+            
+            saveData();
+            renderExecuting();
+            renderStats();
+        }
+
+        // ========== RENDER FUNCTIONS ==========
+
+        function renderAgents() {
+            const container = document.getElementById('agents-list');
+            container.innerHTML = agents.filter(a => a.id !== 'ceo_orchestrator').map(agent => {
+                const isBusy = isAgentBusy(agent.id);
+                const hasProposals = proposals.filter(p => p.agent_id === agent.id && p.status === 'pending').length;
+                
+                return `
+                    <div class="flex items-center justify-between p-3 rounded-lg bg-gray-900/50 ${isBusy ? 'border-l-2 border-green-500' : ''}">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded bg-gray-800 flex items-center justify-center">
+                                <i class="fas fa-robot ${isBusy ? 'text-green-400' : 'text-gray-500'}"></i>
+                            </div>
+                            <div>
+                                <p class="font-medium text-sm">${agent.name}</p>
+                                <p class="text-xs text-gray-500">${isBusy ? 'Executando...' : 'Disponível'}</p>
+                            </div>
+                        </div>
+                        ${hasProposals > 0 ? `<span class="px-2 py-0.5 rounded-full bg-yellow-600/20 text-yellow-400 text-xs">${hasProposals} proposta${hasProposals > 1 ? 's' : ''}</span>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderBacklog() {
+            const container = document.getElementById('backlog-list');
+            const sorted = backlog.filter(t => t.status === 'pending').sort((a, b) => priorityWeight(a.priority) - priorityWeight(b.priority));
+            
+            if (sorted.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-sm py-4 text-center">Backlog vazio. Aguardando propostas...</p>';
+                return;
+            }
+            
+            container.innerHTML = sorted.map((task, idx) => `
+                <div class="backlog-item card p-4 priority-${task.priority} flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="text-lg font-bold text-gray-600">#${idx + 1}</span>
+                        <div>
+                            <p class="font-medium">${task.title}</p>
+                            <p class="text-sm text-gray-500">${agents.find(a => a.id === task.agent_id)?.name} • ${task.estimated_value || 'Sem valor estimado'}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-1 rounded text-xs ${task.priority === 'p0' ? 'bg-red-600/20 text-red-400' : task.priority === 'p1' ? 'bg-yellow-600/20 text-yellow-400' : 'bg-gray-700 text-gray-300'}">
+                            ${task.priority.toUpperCase()}
+                        </span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderProposals() {
+            const container = document.getElementById('proposals-list');
+            const pending = proposals.filter(p => p.status === 'pending');
+            
+            if (pending.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-sm py-4 text-center">Nenhuma proposta pendente</p>';
+                return;
+            }
+            
+            container.innerHTML = pending.map(prop => `
+                <div class="card p-4 border-l-2 border-yellow-500 cursor-pointer hover:bg-gray-800/50" onclick="openProposalModal('${prop.id}')">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="font-medium">${prop.title}</p>
+                            <p class="text-sm text-gray-500">${prop.agent_name} • Impacto: ${prop.impact} • Esforço: ${prop.effort}</p>
+                        </div>
+                        <span class="px-2 py-1 rounded text-xs bg-yellow-600/20 text-yellow-400">Pendente</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderExecuting() {
+            const container = document.getElementById('executing-list');
+            
+            if (executing.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-sm">Nenhuma tarefa em execução</p>';
+                return;
+            }
+            
+            container.innerHTML = executing.map(task => `
+                <div class="card p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="font-medium">${task.title}</p>
+                        <span class="text-sm text-green-400">${task.progress}%</span>
+                    </div>
+                    <div class="w-full bg-gray-800 rounded-full h-2">
+                        <div class="bg-green-500 h-2 rounded-full transition-all" style="width: ${task.progress}%"></div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">${agents.find(a => a.id === task.agent_id)?.name}</p>
+                </div>
+            `).join('');
+        }
+
+        function renderStats() {
+            document.getElementById('stat-backlog').textContent = backlog.filter(t => t.status === 'pending').length;
+            document.getElementById('stat-prioritized').textContent = backlog.filter(t => t.priority === 'p0' || t.priority === 'p1').length;
+            document.getElementById('stat-executing').textContent = executing.length;
+            document.getElementById('stat-opportunities').textContent = proposals.filter(p => p.status === 'pending').length;
+            document.getElementById('stat-completed').textContent = completed.filter(t => {
+                const date = new Date(t.completed_at);
+                const today = new Date();
+                return date.toDateString() === today.toDateString();
+            }).length;
+        }
+
+        function populateAgentSelect() {
+            const select = document.getElementById('task-agent');
+            select.innerHTML = '<option value="">Selecionar Agente...</option>' + 
+                agents.filter(a => a.id !== 'ceo_orchestrator').map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+        }
+
+        // ========== USER ACTIONS ==========
+
+        function toggleAutonomous() {
+            autonomousMode = !autonomousMode;
+            localStorage.setItem('cp_autonomous', JSON.stringify(autonomousMode));
+            updateAutonomousStatus();
+            addLog('info', `Autonomous mode: ${autonomousMode ? 'ON' : 'OFF'}`);
+        }
+
+        function updateAutonomousStatus() {
+            document.getElementById('autonomous-status').textContent = `Autonomous: ${autonomousMode ? 'ON' : 'OFF'}`;
+            document.getElementById('auto-toggle').textContent = autonomousMode ? 'Desativar' : 'Ativar';
+            document.getElementById('auto-toggle').className = autonomousMode 
+                ? 'px-3 py-1 rounded-lg bg-red-600/20 text-red-400 text-sm hover:bg-red-600/30'
+                : 'px-3 py-1 rounded-lg bg-green-600/20 text-green-400 text-sm hover:bg-green-600/30';
+        }
+
+        function createManualTask() {
+            const agentId = document.getElementById('task-agent').value;
+            const title = document.getElementById('task-title').value;
+            const desc = document.getElementById('task-desc').value;
+            const priority = document.getElementById('task-priority').value;
+
+            if (!agentId || !title) {
+                addLog('warning', 'Preencha agente e título');
+                return;
+            }
+
+            const task = {
+                id: 'task_' + Date.now(),
+                agent_id: agentId,
+                title: title,
+                description: desc,
+                priority: priority,
+                status: 'pending',
+                source: 'manual',
+                created_at: new Date().toISOString()
+            };
+            
+            backlog.push(task);
+            saveData();
+            
+            addLog('info', `Tarefa manual criada: ${title} (${priority})`);
+            document.getElementById('task-form').reset();
+            renderBacklog();
+            renderStats();
+        }
+
+        function openProposalModal(proposalId) {
+            const proposal = proposals.find(p => p.id === proposalId);
+            if (!proposal) return;
+            
+            currentProposalId = proposalId;
+            
+            document.getElementById('proposal-content').innerHTML = `
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-xs text-gray-500 uppercase">Agente Proponente</label>
+                        <p class="font-medium">${proposal.agent_name}</p>                    
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500 uppercase">Oportunidade</label>
+                        <p class="text-lg">${proposal.title}</p>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500 uppercase">Justificativa</label>
+                        <p class="text-gray-300">${proposal.description}</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="p-3 rounded-lg bg-gray-900">
+                            <p class="text-xs text-gray-500">Impacto</p>
+                            <p class="font-medium capitalize">${proposal.impact}</p>
+                        </div>
+                        <div class="p-3 rounded-lg bg-gray-900">
+                            <p class="text-xs text-gray-500">Esforço</p>
+                            <p class="font-medium capitalize">${proposal.effort}</p>
+                        </div>
+                        <div class="p-3 rounded-lg bg-gray-900">
+                            <p class="text-xs text-gray-500">Valor Estimado</p>
+                            <p class="font-medium">${proposal.estimated_value}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('proposal-modal').classList.remove('hidden');
+        }
+
+        function closeProposalModal() {
+            document.getElementById('proposal-modal').classList.add('hidden');
+            currentProposalId = null;
+        }
+
+        function approveProposal(priority) {
+            if (!currentProposalId) return;
+            approveProposalByOrchestrator(currentProposalId, priority);
+            closeProposalModal();
+        }
+
+        function rejectProposal() {
+            if (!currentProposalId) return;
+            
+            const proposal = proposals.find(p => p.id === currentProposalId);
+            if (proposal) {
+                proposal.status = 'rejected';
+                addLog('info', `Proposta rejeitada: ${proposal.title}`);
+                saveData();
+                renderProposals();
+                renderStats();
+            }
+            
+            closeProposalModal();
+        }
+
+        function runPrioritization() {
+            // Re-sort backlog
+            backlog.sort((a, b) => priorityWeight(a.priority) - priorityWeight(b.priority));
+            saveData();
+            renderBacklog();
+            addLog('info', 'Backlog re-priorizado pelo CEO_ORCHESTRATOR');
+        }
+
+        function addLog(level, message) {
+            const entry = {
+                id: 'log_' + Date.now(),
+                level,
+                message,
+                timestamp: new Date().toLocaleTimeString()
+            };
+            logs.push(entry);
+            if (logs.length > 50) logs.shift();
+            saveData();
+            
+            const container = document.getElementById('logs-container');
+            const div = document.createElement('div');
+            div.className = `log-${level}`;
+            div.innerHTML = `
+                <span class="text-gray-600">[${entry.timestamp}]</span>
+                <span class="uppercase text-[10px] px-1 rounded bg-gray-800">${level}</span>
+                <span>${message}</span>
+            `;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function refreshData() {
+            renderAgents();
+            renderBacklog();
+            renderProposals();
+            renderExecuting();
+            renderStats();
+            addLog('info', 'Refresh manual');
+        }
+
+        // Close modal on outside click
+        document.getElementById('proposal-modal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeProposalModal();
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
