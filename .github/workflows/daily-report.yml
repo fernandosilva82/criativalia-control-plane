@@ -1,0 +1,46 @@
+name: Daily Report
+
+on:
+  schedule:
+    # Run at 07:00 BRT (10:00 UTC)
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: npm install node-fetch@2
+        working-directory: ./reports
+      
+      - name: Generate and send report
+        env:
+          SHOPIFY_SHOP: ${{ secrets.SHOPIFY_SHOP }}
+          SHOPIFY_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ACCESS_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: node daily-report.js
+        working-directory: ./reports
+      
+      - name: Save report to history
+        run: |
+          mkdir -p history
+          cp reports/output/latest.json history/$(date +%Y-%m-%d).json
+      
+      - name: Commit history
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add history/
+          git diff --quiet && git diff --staged --quiet || git commit -m "Add daily report for $(date +%Y-%m-%d)"
+          git push
