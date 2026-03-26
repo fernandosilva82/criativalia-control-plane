@@ -458,6 +458,14 @@
         }
 
         function init() {
+            // Check if we need demo data (first run or empty state)
+            const savedAgents = JSON.parse(localStorage.getItem('cp_agents') || '[]');
+            const hasData = savedAgents.length > 0 || backlog.length > 0 || executing.length > 0;
+            
+            if (!hasData) {
+                loadDemoData();
+            }
+            
             renderAgents();
             renderBacklog();
             renderProposals();
@@ -465,13 +473,150 @@
             renderStats();
             populateAgentSelect();
             updateAutonomousStatus();
-            addLog('info', 'Control Plane v2.0 initialized - Autonomous mode: ' + (autonomousMode ? 'ON' : 'OFF'));
+            addLog('info', 'Control Plane v2.1 initialized - Autonomous mode: ' + (autonomousMode ? 'ON' : 'OFF'));
+            addLog('info', `System loaded: ${agents.length} agents, ${backlog.length} tasks, ${executing.length} executing`);
             
             // Autonomous loop
             if (autonomousMode) {
                 setInterval(runAutonomousCycle, 10000); // Every 10 seconds
                 setInterval(simulateOpportunityDiscovery, 60000); // Every minute
             }
+        }
+        
+        // Load demo data to show system capabilities
+        function loadDemoData() {
+            // Add some pending tasks to backlog
+            const demoTasks = [
+                {
+                    id: 'demo_task_1',
+                    agent_id: 'bash_architect',
+                    title: 'Criar script de backup automático',
+                    description: 'Implementar backup diário do banco de dados',
+                    priority: 'p0',
+                    status: 'pending',
+                    source: 'opportunity',
+                    estimated_value: 'Alto',
+                    created_at: new Date().toISOString()
+                },
+                {
+                    id: 'demo_task_2',
+                    agent_id: 'data_analyst',
+                    title: 'Analisar métricas de conversão',
+                    description: 'Identificar gargalos no funil de vendas',
+                    priority: 'p1',
+                    status: 'pending',
+                    source: 'manual',
+                    estimated_value: 'Médio',
+                    created_at: new Date().toISOString()
+                },
+                {
+                    id: 'demo_task_3',
+                    agent_id: 'ui_guardian',
+                    title: 'Revisar responsividade mobile',
+                    description: 'Ajustar layouts para dispositivos menores',
+                    priority: 'p1',
+                    status: 'pending',
+                    source: 'opportunity',
+                    estimated_value: 'Médio',
+                    created_at: new Date().toISOString()
+                },
+                {
+                    id: 'demo_task_4',
+                    agent_id: 'copywriter',
+                    title: 'Criar copy para campanha de Páscoa',
+                    description: 'Email marketing e posts para redes sociais',
+                    priority: 'p2',
+                    status: 'pending',
+                    source: 'manual',
+                    estimated_value: 'Baixo',
+                    created_at: new Date().toISOString()
+                }
+            ];
+            
+            backlog.push(...demoTasks);
+            
+            // Add a task in execution
+            const executingTask = {
+                id: 'demo_exec_1',
+                agent_id: 'night_watch',
+                title: 'Monitoramento noturno - Patrol #1',
+                description: 'Verificação de pedidos e alertas',
+                priority: 'p0',
+                status: 'in_progress',
+                source: 'autonomous',
+                started_at: new Date().toISOString(),
+                progress: 65
+            };
+            
+            executing.push(executingTask);
+            
+            // Add a pending proposal
+            const demoProposal = {
+                id: 'demo_prop_1',
+                agent_id: 'deploy_engineer',
+                agent_name: 'DEPLOY_ENGINEER',
+                title: 'Otimizar pipeline de deploy',
+                description: 'Identificado gargalo no build. Tempo médio pode reduzir de 8min para 3min com caching.',
+                impact: 'high',
+                effort: 'medium',
+                estimated_value: 'Alto',
+                status: 'pending',
+                created_at: new Date().toISOString()
+            };
+            
+            proposals.push(demoProposal);
+            
+            // Add some logs
+            const demoLogs = [
+                { level: 'info', message: 'NIGHT_WATCH iniciou patrol noturno', timestamp: new Date(Date.now() - 300000).toLocaleTimeString() },
+                { level: 'info', message: 'CEO_ORCHESTRATOR priorizou 4 tarefas', timestamp: new Date(Date.now() - 240000).toLocaleTimeString() },
+                { level: 'success', message: 'BASH_ARCHITECT completou setup.sh', timestamp: new Date(Date.now() - 180000).toLocaleTimeString() },
+                { level: 'warning', message: 'DATA_ANALYST detectou queda de 15% em conversão', timestamp: new Date(Date.now() - 120000).toLocaleTimeString() },
+                { level: 'info', message: 'DEPLOY_ENGINEER propondo otimização', timestamp: new Date(Date.now() - 60000).toLocaleTimeString() }
+            ];
+            
+            logs.push(...demoLogs);
+            
+            // Add completed tasks
+            const demoCompleted = [
+                {
+                    id: 'demo_done_1',
+                    agent_id: 'bash_architect',
+                    title: 'Criar scripts de setup',
+                    priority: 'p0',
+                    status: 'completed',
+                    completed_at: new Date().toISOString()
+                },
+                {
+                    id: 'demo_done_2',
+                    agent_id: 'deploy_engineer',
+                    title: 'Configurar deploy Vercel',
+                    priority: 'p0',
+                    status: 'completed',
+                    completed_at: new Date().toISOString()
+                },
+                {
+                    id: 'demo_done_3',
+                    agent_id: 'ui_guardian',
+                    title: 'Revisão de UI v2.0',
+                    priority: 'p1',
+                    status: 'completed',
+                    completed_at: new Date().toISOString()
+                }
+            ];
+            
+            completed.push(...demoCompleted);
+            
+            // Mark one agent as running
+            const nightWatch = agents.find(a => a.id === 'night_watch');
+            if (nightWatch) {
+                nightWatch.status = 'running';
+                nightWatch.current_task = 'Monitoramento noturno';
+            }
+            
+            saveData();
+            
+            addLog('info', 'Demo data loaded - System demonstration mode');
         }
 
         // ========== AUTONOMOUS SYSTEM ==========
