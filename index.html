@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criativalia Control Plane</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #0a0a0b; color: #fafafa; }
+        .card { background: #141414; border: 1px solid #2a2a2a; border-radius: 12px; }
+        .btn-primary { background: #c17767; color: white; }
+        .btn-primary:hover { background: #d48877; }
+        .status-idle { color: #888; }
+        .status-running { color: #7a9e7e; }
+        .status-error { color: #c17767; }
+        .log-debug { color: #888; }
+        .log-info { color: #fafafa; }
+        .log-warning { color: #d4a373; }
+        .log-error { color: #c17767; }
+        .agent-card { transition: all 0.2s; }
+        .agent-card:hover { border-color: #c17767; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <header class="border-b border-gray-800 bg-gray-900/50 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
+                    <i class="fas fa-rocket text-white"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg">Criativalia Control Plane</h1>
+                    <p class="text-xs text-gray-400">Multi-Agent Runtime v1.0</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div id="runtime-status" class="flex items-center gap-2 text-sm">
+                    <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                    <span>Running</span>
+                </div>
+                <button onclick="refreshData()" class="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-6">
+        <!-- Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="card p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-500 uppercase">Active Agents</p>
+                        <p class="text-2xl font-bold" id="stat-active">0</p>
+                    </div>
+                    <i class="fas fa-robot text-gray-600 text-xl"></i>
+                </div>
+            </div>
+            <div class="card p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-500 uppercase">Active Tasks</p>
+                        <p class="text-2xl font-bold" id="stat-tasks">0</p>
+                    </div>
+                    <i class="fas fa-tasks text-gray-600 text-xl"></i>
+                </div>
+            </div>
+            <div class="card p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-500 uppercase">Pending Review</p>
+                        <p class="text-2xl font-bold" id="stat-review">0</p>
+                    </div>
+                    <i class="fas fa-code-branch text-gray-600 text-xl"></i>
+                </div>
+            </div>
+            <div class="card p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-500 uppercase">Uptime</p>
+                        <p class="text-2xl font-bold">99.9%</p>
+                    </div>
+                    <i class="fas fa-heartbeat text-green-500 text-xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Agents -->
+            <div class="lg:col-span-2 space-y-6">
+                <div class="card p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="font-semibold flex items-center gap-2">
+                            <i class="fas fa-robot text-c17767"></i>
+                            Agents
+                        </h2>
+                        <div class="flex gap-2">
+                            <button onclick="startAll()" class="px-3 py-1 rounded bg-green-600/20 text-green-400 text-sm hover:bg-green-600/30">
+                                <i class="fas fa-play mr-1"></i>Start All
+                            </button>
+                            <button onclick="stopAll()" class="px-3 py-1 rounded bg-red-600/20 text-red-400 text-sm hover:bg-red-600/30">
+                                <i class="fas fa-stop mr-1"></i>Stop All
+                            </button>
+                        </div>
+                    </div>
+                    <div id="agents-list" class="space-y-3">
+                        <!-- Agents loaded here -->
+                    </div>
+                </div>
+
+                <!-- Tasks -->
+                <div class="card p-6">
+                    <h2 class="font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-tasks text-c17767"></i>
+                        Recent Tasks
+                    </h2>
+                    <div id="tasks-list" class="space-y-2">
+                        <!-- Tasks loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="space-y-6">
+                <!-- Create Task -->
+                <div class="card p-6">
+                    <h2 class="font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-plus-circle text-c17767"></i>
+                        Create Task
+                    </h2>
+                    <form id="task-form" class="space-y-3">
+                        <select id="task-agent" class="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 text-sm">
+                            <option value="">Select Agent...</option>
+                        </select>
+                        <input type="text" id="task-title" placeholder="Task title..." 
+                            class="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 text-sm">
+                        <textarea id="task-desc" placeholder="Description..." rows="3"
+                            class="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 text-sm"></textarea>
+                        <select id="task-priority" class="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 text-sm">
+                            <option value="5">Priority: Normal</option>
+                            <option value="10">Priority: High</option>
+                            <option value="1">Priority: Low</option>
+                        </select>
+                        <button type="button" onclick="createTask()" class="w-full btn-primary py-2 rounded-lg font-medium">
+                            Create Task
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="card p-6">
+                    <h2 class="font-semibold mb-4">Quick Actions</h2>
+                    <div class="space-y-2">
+                        <button onclick="viewChanges()" class="w-full text-left px-3 py-2 rounded-lg bg-gray-900 hover:bg-gray-800 text-sm flex items-center gap-2">
+                            <i class="fas fa-code-branch text-c17767"></i>
+                            Review Changes
+                        </button>
+                        <button onclick="exportData()" class="w-full text-left px-3 py-2 rounded-lg bg-gray-900 hover:bg-gray-800 text-sm flex items-center gap-2">
+                            <i class="fas fa-download text-c17767"></i>
+                            Export Data
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live Logs -->
+                <div class="card p-6">
+                    <h2 class="font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-terminal text-c17767"></i>
+                        Live Logs
+                    </h2>
+                    <div id="logs-container" class="h-48 overflow-y-auto space-y-1 text-xs font-mono bg-gray-950 p-3 rounded-lg">
+                        <!-- Logs here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal -->
+    <div id="agent-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div class="card max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h3 id="modal-title" class="text-xl font-bold"></h3>
+                <button onclick="closeModal()" class="p-2 hover:bg-gray-800 rounded-lg">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="modal-content"></div>
+        </div>
+    </div>
+
+    <script>
+        // Default agents data
+        const DEFAULT_AGENTS = [
+            {
+                id: 'ceo_orchestrator',
+                name: 'CEO_ORCHESTRATOR',
+                role: 'Chief Executive Officer / System Orchestrator',
+                status: 'idle',
+                description: 'Orquestra todos os agentes, toma decisões estratégicas, maximiza lucro',
+                skills: ['strategy', 'coordination', 'decision_making', 'resource_allocation'],
+                config: { priority: 10, auto_start: false }
+            },
+            {
+                id: 'traffic_manager',
+                name: 'TRAFFIC_MANAGER',
+                role: 'Gestor de Tráfego Pago',
+                status: 'idle',
+                description: 'Gerencia campanhas Meta Ads e Google Ads, otimiza ROAS',
+                skills: ['meta_ads', 'google_ads', 'analytics', 'creative_strategy'],
+                config: { budget_daily: 50, priority: 9, auto_start: false }
+            },
+            {
+                id: 'shopify_specialist',
+                name: 'SHOPIFY_SPECIALIST',
+                role: 'Especialista Shopify',
+                status: 'idle',
+                description: 'Otimiza loja, gerencia produtos, integra APIs',
+                skills: ['shopify_api', 'ecommerce', 'inventory', 'seo'],
+                config: { priority: 8, auto_start: false }
+            },
+            {
+                id: 'copywriter',
+                name: 'COPYWRITER',
+                role: 'Redator de Conversão',
+                status: 'idle',
+                description: 'Cria copy para ads, produtos, emails que vende',
+                skills: ['copywriting', 'seo', 'email_marketing', 'brand_voice'],
+                config: { priority: 7, auto_start: false }
+            },
+            {
+                id: 'designer',
+                name: 'DESIGNER',
+                role: 'Designer Visual',
+                status: 'idle',
+                description: 'Cria visuais, mockups, assets para campanhas',
+                skills: ['graphic_design', 'ui_design', 'brand_identity', 'canva_figma'],
+                config: { priority: 7, auto_start: false }
+            },
+            {
+                id: 'dev_automation',
+                name: 'DEV_AUTOMATION_AI',
+                role: 'Desenvolvedor / Automação',
+                status: 'idle',
+                description: 'Desenvolve scripts, automações, integrações',
+                skills: ['javascript', 'python', 'automation', 'apis', 'scraping'],
+                config: { priority: 8, auto_start: false }
+            },
+            {
+                id: 'data_analyst',
+                name: 'DATA_ANALYST',
+                role: 'Analista de Dados',
+                status: 'idle',
+                description: 'Analisa métricas, gera relatórios, identifica insights',
+                skills: ['analytics', 'sql', 'data_viz', 'reporting'],
+                config: { priority: 6, auto_start: false }
+            },
+            {
+                id: 'executor',
+                name: 'EXECUTOR',
+                role: 'Executor de Tarefas',
+                status: 'idle',
+                description: 'Executa tarefas operacionais rapidamente',
+                skills: ['execution', 'research', 'data_entry', 'validation'],
+                config: { priority: 5, auto_start: false }
+            }
+        ];
+
+        // Data storage (localStorage)
+        let agents = JSON.parse(localStorage.getItem('cp_agents')) || DEFAULT_AGENTS;
+        let tasks = JSON.parse(localStorage.getItem('cp_tasks')) || [];
+        let sessions = JSON.parse(localStorage.getItem('cp_sessions')) || [];
+        let logs = JSON.parse(localStorage.getItem('cp_logs')) || [];
+        let changes = JSON.parse(localStorage.getItem('cp_changes')) || [];
+
+        function saveData() {
+            localStorage.setItem('cp_agents', JSON.stringify(agents));
+            localStorage.setItem('cp_tasks', JSON.stringify(tasks));
+            localStorage.setItem('cp_sessions', JSON.stringify(sessions));
+            localStorage.setItem('cp_logs', JSON.stringify(logs));
+            localStorage.setItem('cp_changes', JSON.stringify(changes));
+        }
+
+        function init() {
+            renderAgents();
+            renderTasks();
+            renderStats();
+            populateAgentSelect();
+            addLog('info', 'Control Plane initialized');
+            
+            // Simulate runtime heartbeat
+            setInterval(() => {
+                addLog('debug', 'Heartbeat: system operational');
+            }, 30000);
+        }
+
+        function renderAgents() {
+            const container = document.getElementById('agents-list');
+            container.innerHTML = agents.map(agent => `
+                <div class="agent-card card p-4 flex items-center justify-between cursor-pointer" onclick="viewAgent('${agent.id}')">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-gray-800 flex items-center justify-center">
+                            <i class="fas fa-robot ${agent.status === 'running' ? 'text-green-400' : 'text-gray-500'}"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-medium">${agent.name}</h3>
+                            <p class="text-sm text-gray-500">${agent.role}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="status-${agent.status}">
+                            <i class="fas fa-circle text-xs"></i>
+                            ${agent.status}
+                        </span>
+                        <button onclick="event.stopPropagation(); toggleAgent('${agent.id}')" 
+                            class="px-3 py-1 rounded ${agent.status === 'running' ? 'bg-red-600/20 text-red-400' : 'bg-green-600/20 text-green-400'} text-sm">
+                            ${agent.status === 'running' ? 'Stop' : 'Start'}
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderTasks() {
+            const container = document.getElementById('tasks-list');
+            const recentTasks = tasks.slice(-5).reverse();
+            
+            if (recentTasks.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-sm">No tasks yet</p>';
+                return;
+            }
+            
+            container.innerHTML = recentTasks.map(task => `
+                <div class="flex items-center justify-between p-3 rounded-lg bg-gray-900/50">
+                    <div>
+                        <p class="font-medium text-sm">${task.title}</p>
+                        <p class="text-xs text-gray-500">${agents.find(a => a.id === task.agent_id)?.name || 'Unknown'} • ${task.status}</p>
+                    </div>
+                    <span class="px-2 py-1 rounded text-xs ${task.status === 'completed' ? 'bg-green-900 text-green-400' : task.status === 'in_progress' ? 'bg-blue-900 text-blue-400' : 'bg-gray-800 text-gray-400'}">
+                        ${task.status}
+                    </span>
+                </div>
+            `).join('');
+        }
+
+        function renderStats() {
+            const activeAgents = agents.filter(a => a.status === 'running').length;
+            const activeTasks = tasks.filter(t => ['pending', 'in_progress'].includes(t.status)).length;
+            const pendingReview = changes.filter(c => !c.reviewed).length;
+            
+            document.getElementById('stat-active').textContent = activeAgents;
+            document.getElementById('stat-tasks').textContent = activeTasks;
+            document.getElementById('stat-review').textContent = pendingReview;
+        }
+
+        function populateAgentSelect() {
+            const select = document.getElementById('task-agent');
+            select.innerHTML = '<option value="">Select Agent...</option>' + 
+                agents.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+        }
+
+        function toggleAgent(agentId) {
+            const agent = agents.find(a => a.id === agentId);
+            if (!agent) return;
+            
+            if (agent.status === 'idle') {
+                agent.status = 'running';
+                addLog('info', `Agent started: ${agent.name}`);
+            } else {
+                agent.status = 'idle';
+                addLog('info', `Agent stopped: ${agent.name}`);
+            }
+            
+            saveData();
+            renderAgents();
+            renderStats();
+        }
+
+        function createTask() {
+            const agentId = document.getElementById('task-agent').value;
+            const title = document.getElementById('task-title').value;
+            const desc = document.getElementById('task-desc').value;
+            const priority = document.getElementById('task-priority').value;
+
+            if (!agentId || !title) {
+                addLog('warning', 'Please select agent and enter title');
+                return;
+            }
+
+            const task = {
+                id: 'task_' + Date.now(),
+                agent_id: agentId,
+                title: title,
+                description: desc,
+                priority: parseInt(priority),
+                status: 'pending',
+                created_at: new Date().toISOString()
+            };
+            
+            tasks.push(task);
+            saveData();
+            
+            addLog('info', `Created task: ${title}`);
+            document.getElementById('task-form').reset();
+            renderTasks();
+            renderStats();
+        }
+
+        function viewAgent(agentId) {
+            const agent = agents.find(a => a.id === agentId);
+            if (!agent) return;
+
+            document.getElementById('modal-title').textContent = agent.name;
+            document.getElementById('modal-content').innerHTML = `
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-xs text-gray-500 uppercase">Role</label>
+                        <p>${agent.role}</p>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500 uppercase">Description</label>
+                        <p class="text-gray-300">${agent.description}</p>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500 uppercase">Skills</label>
+                        <div class="flex flex-wrap gap-2 mt-1">
+                            ${agent.skills.map(s => `<span class="px-2 py-1 rounded bg-gray-800 text-sm">${s}</span>`).join('')}
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500 uppercase">Configuration</label>
+                        <pre class="mt-1 p-3 rounded-lg bg-gray-900 text-xs overflow-x-auto">${JSON.stringify(agent.config, null, 2)}</pre>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500 uppercase">Tasks</label>
+                        <p class="text-gray-300">${tasks.filter(t => t.agent_id === agentId).length} total tasks</p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('agent-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('agent-modal').classList.add('hidden');
+        }
+
+        function viewChanges() {
+            const pendingChanges = changes.filter(c => !c.reviewed);
+            addLog('info', `Viewing ${pendingChanges.length} pending changes`);
+            alert(`${pendingChanges.length} changes pending review. Check console for details.`);
+        }
+
+        function exportData() {
+            const data = { agents, tasks, sessions, logs, changes };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `criativalia-control-plane-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            addLog('info', 'Data exported');
+        }
+
+        function refreshData() {
+            renderAgents();
+            renderTasks();
+            renderStats();
+            addLog('info', 'Manual refresh');
+        }
+
+        function addLog(level, message) {
+            const entry = {
+                id: 'log_' + Date.now(),
+                level: level,
+                message: message,
+                created_at: new Date().toISOString()
+            };
+            logs.push(entry);
+            if (logs.length > 100) logs.shift();
+            saveData();
+            
+            const container = document.getElementById('logs-container');
+            const div = document.createElement('div');
+            div.className = `log-${level}`;
+            div.innerHTML = `
+                <span class="text-gray-600">[${new Date().toLocaleTimeString()}]</span>
+                <span class="uppercase text-[10px] px-1 rounded bg-gray-800">${level}</span>
+                <span>${message}</span>
+            `;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function startAll() {
+            agents.filter(a => a.status === 'idle').forEach(a => {
+                a.status = 'running';
+                addLog('info', `Agent started: ${a.name}`);
+            });
+            saveData();
+            renderAgents();
+            renderStats();
+        }
+
+        function stopAll() {
+            agents.filter(a => a.status === 'running').forEach(a => {
+                a.status = 'idle';
+                addLog('info', `Agent stopped: ${a.name}`);
+            });
+            saveData();
+            renderAgents();
+            renderStats();
+        }
+
+        // Close modal on outside click
+        document.getElementById('agent-modal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeModal();
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
