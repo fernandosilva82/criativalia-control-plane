@@ -214,6 +214,46 @@
         // Agent definitions with opportunity detection capabilities
         const AGENT_DEFINITIONS = [
             {
+                id: 'bash_architect',
+                name: 'BASH_ARCHITECT',
+                role: 'Shell/CLI Architect',
+                description: 'Design and build premium shell scripts, CLI tooling, terminal workflows',
+                skills: ['bash', 'shell_scripting', 'cli_design', 'automation', 'terminal_ux'],
+                config: { priority: 8, can_propose: true },
+                opportunity_areas: ['bootstrap_scripts', 'setup_scripts', 'deploy_scripts', 'diagnostics', 'recovery_scripts'],
+                soul: 'precise, elegant, pragmatic, modern, systems-minded'
+            },
+            {
+                id: 'deploy_engineer',
+                name: 'DEPLOY_ENGINEER',
+                role: 'Deployment Engineer',
+                description: 'Ensure reliable deployments and post-deploy verification',
+                skills: ['github', 'vercel', 'ci_cd', 'env_validation', 'build_validation'],
+                config: { priority: 9, can_propose: true },
+                opportunity_areas: ['deployment_issues', 'env_validation', 'build_failures', 'post_deploy_checks'],
+                soul: 'calm, careful, technical, accountable, reliability-focused'
+            },
+            {
+                id: 'ui_guardian',
+                name: 'PREMIUM_UI_GUARDIAN',
+                role: 'UI/UX Guardian',
+                description: 'Protect product aesthetics and prevent ugly interfaces',
+                skills: ['ui_review', 'visual_design', 'ux_improvement', 'layout', 'spacing'],
+                config: { priority: 7, can_propose: true },
+                opportunity_areas: ['visual_inconsistencies', 'layout_issues', 'spacing_problems', 'readability', 'dashboard_presentation'],
+                soul: 'tasteful, refined, demanding, visually intelligent'
+            },
+            {
+                id: 'release_manager',
+                name: 'RELEASE_MANAGER',
+                role: 'Release Manager',
+                description: 'Turn technical work into shippable, validated releases',
+                skills: ['release_management', 'checklists', 'validation', 'documentation'],
+                config: { priority: 8, can_propose: true },
+                opportunity_areas: ['missing_checklists', 'validation_gaps', 'release_docs', 'known_issues_tracking'],
+                soul: 'structured, trustworthy, delivery-oriented'
+            },
+            {
                 id: 'ceo_orchestrator',
                 name: 'CEO_ORCHESTRATOR',
                 role: 'Orquestrador / Priorizador',
@@ -289,6 +329,30 @@
 
         // Opportunity templates by agent
         const OPPORTUNITY_TEMPLATES = {
+            bash_architect: [
+                { title: 'Criar script de setup automatizado do projeto', impact: 'high', effort: 'medium', reason: 'Reduzir tempo de onboarding de 30min para 5min' },
+                { title: 'Script de diagnóstico de ambiente', impact: 'medium', effort: 'low', reason: 'Detectar problemas antes do deploy' },
+                { title: 'Automação de backup do banco de dados', impact: 'high', effort: 'medium', reason: 'Prevenção contra perda de dados' },
+                { title: 'Script de rollback de deploy', impact: 'high', effort: 'medium', reason: 'Recuperação rápida em caso de falha' }
+            ],
+            deploy_engineer: [
+                { title: 'Verificar e corrigir variáveis de ambiente', impact: 'high', effort: 'low', reason: 'Prevenir falhas de runtime' },
+                { title: 'Configurar preview deployment para PRs', impact: 'medium', effort: 'medium', reason: 'Testar antes de mergear' },
+                { title: 'Auditoria de build e otimização', impact: 'medium', effort: 'high', reason: 'Reduzir tempo de build em 50%' },
+                { title: 'Post-deploy health check automatizado', impact: 'high', effort: 'medium', reason: 'Garantir que deploy funcionou' }
+            ],
+            ui_guardian: [
+                { title: 'Revisar e ajustar espaçamentos do dashboard', impact: 'medium', effort: 'low', reason: 'Melhorar hierarquia visual' },
+                { title: 'Padronizar tipografia e cores', impact: 'medium', effort: 'medium', reason: 'Consistência de marca' },
+                { title: 'Melhorar responsividade mobile', impact: 'high', effort: 'high', reason: '40% dos usuários acessam pelo celular' },
+                { title: 'Revisar contraste e acessibilidade', impact: 'medium', effort: 'low', reason: 'WCAG compliance' }
+            ],
+            release_manager: [
+                { title: 'Criar checklist de release', impact: 'medium', effort: 'low', reason: 'Evitar esquecer passos críticos' },
+                { title: 'Documentar mudanças da versão atual', impact: 'medium', effort: 'medium', reason: 'Comunicação com stakeholders' },
+                { title: 'Relatório de validação de release', impact: 'high', effort: 'medium', reason: 'Prova de que funciona' },
+                { title: 'Identificar e documentar issues conhecidos', impact: 'medium', effort: 'low', reason: 'Transparência com usuários' }
+            ],
             traffic_manager: [
                 { title: 'Criar nova campanha de retargeting', impact: 'high', effort: 'medium', reason: 'Clientes que visitaram mas não compraram' },
                 { title: 'Testar 3 novos criativos para campanha ativa', impact: 'medium', effort: 'low', reason: 'Creative fatigue detectado' },
