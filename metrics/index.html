@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criativalia — Metrics Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0b;
+            color: #fafafa;
+        }
+        
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        
+        .card {
+            background: #141414;
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+        }
+        
+        .accent { color: #c17767; }
+        .accent-bg { background: #c17767; }
+        
+        .kpi-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 2rem;
+            font-weight: 600;
+        }
+        
+        .positive { color: #7a9e7e; }
+        .negative { color: #c17767; }
+        
+        .loading {
+            background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        .pulse-dot {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0a0a0b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2a2a2a;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3a3a3a;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- Header -->
+    <header class="border-b border-gray-800 bg-gray-900/50 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg accent-bg flex items-center justify-center">
+                        <i class="fas fa-chart-line text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg">Criativalia</h1>
+                        <p class="text-xs text-gray-400">Metrics Dashboard</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2 text-sm bg-gray-800 px-3 py-1 rounded-lg">
+                        <span id="connection-status" class="w-2 h-2 rounded-full bg-gray-500"></span>
+                        <span id="connection-text">Desconectado</span>
+                    </div>
+                    <button onclick="refreshData()" class="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button onclick="showConfig()" class="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-6">
+        <!-- Config Panel (hidden by default) -->
+        <div id="config-panel" class="hidden card p-6 mb-6">
+            <h2 class="font-semibold mb-4 flex items-center gap-2">
+                <i class="fas fa-cog accent"></i>
+                Configuração Shopify
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm text-gray-500 mb-1">Shop Domain</label>
+                    <input type="text" id="shop-domain" placeholder="sua-loja.myshopify.com"
+                        class="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 text-sm"
+                        value="">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-500 mb-1">Access Token</label>
+                    <input type="password" id="access-token" placeholder="shpat_xxxxxxxx"
+                        class="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 text-sm"
+                        value="">
+                </div>
+            </div>
+            <div class="mt-4 flex gap-3">
+                <button onclick="saveConfig()" class="px-4 py-2 rounded-lg accent-bg text-white font-medium">
+                    Salvar & Conectar
+                </button>
+                <button onclick="hideConfig()" class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700">
+                    Cancelar
+                </button>
+            </div>
+            <p class="mt-4 text-xs text-gray-500">
+                Token é salvo apenas no seu navegador (localStorage). Nunca enviado para servidores.
+            </p>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="card p-4">
+                <p class="text-xs text-gray-500 uppercase mb-1">Receita (30d)</p>
+                <p id="kpi-revenue" class="kpi-value accent">R$ —</p>
+                <div id="trend-revenue" class="text-xs mt-1"></div>
+            </div>
+            
+            <div class="card p-4">
+                <p class="text-xs text-gray-500 uppercase mb-1">Pedidos (30d)</p>
+                <p id="kpi-orders" class="kpi-value">—</p>
+                <div id="trend-orders" class="text-xs mt-1"></div>
+            </div>
+            
+            <div class="card p-4">
+                <p class="text-xs text-gray-500 uppercase mb-1">Ticket Médio</p>
+                <p id="kpi-aov" class="kpi-value">R$ —</p>
+                <p class="text-xs text-gray-500 mt-1">Meta: R$ 300</p>
+            </div>
+            
+            <div class="card p-4">
+                <p class="text-xs text-gray-500 uppercase mb-1">Taxa Recompra</p>
+                <p id="kpi-repeat" class="kpi-value">—%</p>
+                <p class="text-xs text-red-400 mt-1">CRÍTICO: 0%</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Revenue Chart -->
+            <div class="lg:col-span-2 card p-6">
+                <h2 class="font-semibold mb-4 flex items-center gap-2">
+                    <i class="fas fa-chart-area accent"></i>
+                    Receita (Últimos 30 dias)
+                </h2>
+                <div class="h-64">
+                    <canvas id="revenue-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Top Products -->
+            <div class="card p-6">
+                <h2 class="font-semibold mb-4 flex items-center gap-2">
+                    <i class="fas fa-trophy accent"></i>
+                    Top Produtos
+                </h2>
+                <div id="top-products" class="space-y-3">
+                    <p class="text-gray-500 text-sm">Conecte sua loja Shopify para ver os dados</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Orders Table -->
+        <div class="card p-6 mt-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="font-semibold flex items-center gap-2">
+                    <i class="fas fa-shopping-bag accent"></i>
+                    Pedidos Recentes
+                </h2>
+                <span id="last-updated" class="text-xs text-gray-500"></span>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-500 border-b border-gray-800">
+                            <th class="pb-3 font-medium">Pedido</th>
+                            <th class="pb-3 font-medium">Cliente</th>
+                            <th class="pb-3 font-medium">Data</th>
+                            <th class="pb-3 font-medium">Status</th>
+                            <th class="pb-3 font-medium text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orders-table">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Auto-refresh indicator -->
+        <div class="fixed bottom-6 right-6 flex items-center gap-2 text-xs text-gray-500">
+            <span class="w-2 h-2 rounded-full bg-green-500 pulse-dot"></span>
+            <span>Auto-refresh: 5min</span>
+        </div>
+    </main>
+
+    <script src="shopify-api.js"></script>
+    <script>
+        // State
+        let shopifyAPI = null;
+        let revenueChart = null;
+        
+        // Initialize
+        function init() {
+            loadConfig();
+            
+            // Auto-refresh every 5 minutes
+            setInterval(refreshData, 5 * 60 * 1000);
+        }
+        
+        // Config management
+        function loadConfig() {
+            const domain = localStorage.getItem('shopify_domain');
+            const token = localStorage.getItem('shopify_token');
+            
+            if (domain && token) {
+                document.getElementById('shop-domain').value = domain;
+                document.getElementById('access-token').value = token;
+                connect(domain, token);
+            }
+        }
+        
+        function saveConfig() {
+            const domain = document.getElementById('shop-domain').value;
+            const token = document.getElementById('access-token').value;
+            
+            if (!domain || !token) {
+                alert('Preencha todos os campos');
+                return;
+            }
+            
+            localStorage.setItem('shopify_domain', domain);
+            localStorage.setItem('shopify_token', token);
+            
+            connect(domain, token);
+            hideConfig();
+        }
+        
+        async function connect(domain, token) {
+            updateConnectionStatus('connecting');
+            
+            shopifyAPI = new ShopifyAPI(domain, token);
+            const result = await shopifyAPI.testConnection();
+            
+            if (result.success) {
+                updateConnectionStatus('connected', result.shop.name);
+                await refreshData();
+            } else {
+                updateConnectionStatus('error');
+                alert('Erro ao conectar: ' + result.error);
+            }
+        }
+        
+        function updateConnectionStatus(status, shopName = '') {
+            const indicator = document.getElementById('connection-status');
+            const text = document.getElementById('connection-text');
+            
+            if (status === 'connected') {
+                indicator.className = 'w-2 h-2 rounded-full bg-green-500';
+                text.textContent = shopName || 'Conectado';
+            } else if (status === 'connecting') {
+                indicator.className = 'w-2 h-2 rounded-full bg-yellow-500 animate-pulse';
+                text.textContent = 'Conectando...';
+            } else {
+                indicator.className = 'w-2 h-2 rounded-full bg-red-500';
+                text.textContent = 'Erro';
+            }
+        }
+        
+        // UI Helpers
+        function showConfig() {
+            document.getElementById('config-panel').classList.remove('hidden');
+        }
+        
+        function hideConfig() {
+            document.getElementById('config-panel').classList.add('hidden');
+        }
+        
+        // Format currency
+        function formatCurrency(value) {
+            return 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        
+        // Refresh all data
+        async function refreshData() {
+            if (!shopifyAPI) return;
+            
+            const result = await shopifyAPI.getMetrics(30);
+            
+            if (result.success) {
+                updateKPIs(result.metrics);
+                updateChart(result.metrics.byDay);
+                updateTopProducts(result.metrics.topProducts);
+                updateOrdersTable(result.rawOrders.slice(0, 10));
+                
+                document.getElementById('last-updated').textContent = 
+                    'Atualizado: ' + new Date().toLocaleString('pt-BR');
+            }
+        }
+        
+        // Update KPI cards
+        function updateKPIs(metrics) {
+            document.getElementById('kpi-revenue').textContent = formatCurrency(metrics.totalRevenue);
+            document.getElementById('kpi-orders').textContent = metrics.totalOrders;
+            document.getElementById('kpi-aov').textContent = formatCurrency(metrics.aov);
+            
+            // Calculate repeat rate (placeholder - needs customer data)
+            document.getElementById('kpi-repeat').textContent = '0%';
+        }
+        
+        // Update chart
+        function updateChart(byDay) {
+            const ctx = document.getElementById('revenue-chart').getContext('2d');
+            
+            const labels = Object.keys(byDay).slice(-30);
+            const data = labels.map(date => byDay[date]?.revenue || 0);
+            
+            if (revenueChart) {
+                revenueChart.destroy();
+            }
+            
+            revenueChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Receita',
+                        data: data,
+                        borderColor: '#c17767',
+                        backgroundColor: 'rgba(193, 119, 103, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: '#2a2a2a' },
+                            ticks: { color: '#888' }
+                        },
+                        y: {
+                            grid: { color: '#2a2a2a' },
+                            ticks: { 
+                                color: '#888',
+                                callback: function(value) {
+                                    return 'R$ ' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update top products
+        function updateTopProducts(products) {
+            const container = document.getElementById('top-products');
+            
+            if (products.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-sm">Nenhum produto vendido</p>';
+                return;
+            }
+            
+            container.innerHTML = products.slice(0, 5).map((p, i) => `
+                <div class="flex items-center justify-between p-3 rounded-lg bg-gray-900/50">
+                    <div class="flex items-center gap-3">
+                        <span class="w-6 h-6 rounded bg-gray-800 flex items-center justify-center text-xs font-bold">${i + 1}</span>
+                        <div class="truncate max-w-[150px]">
+                            <p class="font-medium text-sm truncate">${p.name}</p>
+                        </div>
+                    </div>
+                    <span class="text-sm accent">${formatCurrency(p.revenue)}</span>
+                </div>
+            `).join('');
+        }
+        
+        // Update orders table
+        function updateOrdersTable(orders) {
+            const tbody = document.getElementById('orders-table');
+            
+            tbody.innerHTML = orders.map(order => {
+                const statusColors = {
+                    'fulfilled': 'text-green-400',
+                    'partial': 'text-yellow-400',
+                    'unfulfilled': 'text-red-400'
+                };
+                
+                return `
+                    <tr class="border-b border-gray-800">
+                        <td class="py-3 font-mono text-sm">#${order.order_number}</td>
+                        <td class="py-3">${order.customer?.first_name || 'Guest'} ${order.customer?.last_name || ''}</td>
+                        <td class="py-3 text-gray-400">${new Date(order.created_at).toLocaleDateString('pt-BR')}</td>
+                        <td class="py-3 ${statusColors[order.fulfillment_status] || 'text-gray-400'}">${order.fulfillment_status || 'unfulfilled'}</td>
+                        <td class="py-3 text-right font-mono">${formatCurrency(parseFloat(order.total_price))}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        // Start
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
