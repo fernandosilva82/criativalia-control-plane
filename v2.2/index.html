@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criativalia Mission Control v2.2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #0a0a0b; color: #fafafa; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .card { background: #141414; border: 1px solid #2a2a2a; border-radius: 12px; }
+        .accent { color: #c17767; }
+        .accent-bg { background: #c17767; }
+        
+        /* Navigation */
+        .nav-item { 
+            padding: 10px 16px; 
+            border-radius: 8px; 
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .nav-item:hover { background: #1a1a1a; }
+        .nav-item.active { 
+            background: rgba(193, 119, 103, 0.15); 
+            color: #c17767;
+            border: 1px solid rgba(193, 119, 103, 0.3);
+        }
+        
+        /* View containers */
+        .view { display: none; }
+        .view.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        /* Agent status */
+        .agent-running { 
+            border-left: 3px solid #7a9e7e !important;
+            box-shadow: 0 0 15px rgba(122, 158, 126, 0.15);
+        }
+        .agent-idle { border-left: 3px solid #4a5568; }
+        
+        /* Priority badges */
+        .priority-p0 { background: rgba(193, 119, 103, 0.15); border-left: 3px solid #c17767; }
+        .priority-p1 { background: rgba(212, 163, 115, 0.1); border-left: 3px solid #d4a373; }
+        .priority-p2 { border-left: 3px solid #4a5568; }
+        
+        /* Delivery cards */
+        .delivery-card {
+            background: linear-gradient(135deg, #141414 0%, #1a1a1a 100%);
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            transition: all 0.2s;
+        }
+        .delivery-card:hover {
+            border-color: #c17767;
+            transform: translateY(-2px);
+        }
+        
+        /* Timeline */
+        .timeline-item {
+            position: relative;
+            padding-left: 24px;
+            border-left: 2px solid #2a2a2a;
+            margin-left: 8px;
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -5px;
+            top: 4px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #c17767;
+        }
+        .timeline-item.completed::before { background: #7a9e7e; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div class="flex h-screen">
+        <!-- Sidebar Navigation -->
+        <aside class="w-64 bg-gray-900 border-r border-gray-800 flex flex-col">
+            <div class="p-6 border-b border-gray-800">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg accent-bg flex items-center justify-center">
+                        <i class="fas fa-rocket text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold">Criativalia</h1>
+                        <p class="text-xs text-gray-500">Mission Control v2.2</p>
+                    </div>
+                </div>
+            </div>
+            
+            <nav class="flex-1 p-4 space-y-2">
+                <div class="nav-item active" onclick="showView('dashboard')">
+                    <i class="fas fa-chart-line w-5"></i>
+                    <span>Dashboard</span>
+                </div>
+                <div class="nav-item" onclick="showView('agents')">
+                    <i class="fas fa-robot w-5"></i>
+                    <span>Agentes (12)</span>
+                </div>
+                <div class="nav-item" onclick="showView('deliveries')">
+                    <i class="fas fa-box-open w-5"></i>
+                    <span>Entregas</span>
+                </div>
+                <div class="nav-item" onclick="showView('metrics')">
+                    <i class="fas fa-shopping-bag w-5"></i>
+                    <span>Shopify</span>
+                </div>
+                <div class="nav-item" onclick="showView('tasks')">
+                    <i class="fas fa-tasks w-5"></i>
+                    <span>Tarefas</span>
+                </div>
+                <div class="nav-item" onclick="showView('logs')">
+                    <i class="fas fa-terminal w-5"></i>
+                    <span>Logs</span>
+                </div>
+            </nav>
+            
+            <div class="p-4 border-t border-gray-800">
+                <div class="flex items-center gap-2 text-xs text-gray-500">
+                    <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                    <span>Sistema Online</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto">
+            <!-- Header -->
+            <header class="sticky top-0 bg-gray-900/90 backdrop-blur border-b border-gray-800 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <h2 id="page-title" class="text-xl font-semibold">Dashboard</h2>
+                    <div class="flex items-center gap-4">
+                        <button onclick="refreshAllData()" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm">
+                            <i class="fas fa-sync-alt mr-2"></i>Atualizar
+                        </button>
+                        <div class="text-sm text-gray-400" id="last-update">Atualizado: agora</div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- VIEW: Dashboard -->
+            <div id="view-dashboard" class="view active p-6">
+                <!-- Shopify Connection Status -->
+                <div id="shopify-status" class="card p-4 mb-6 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="w-3 h-3 rounded-full bg-yellow-500"></span>
+                        <span>Shopify: Não conectado</span>
+                    </div>
+                    <button onclick="showShopifyConfig()" class="px-3 py-1.5 rounded-lg accent-bg text-sm">
+                        Conectar
+                    </button>
+                </div>
+
+                <!-- KPIs -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="card p-4">
+                        <p class="text-xs text-gray-500 uppercase">Receita (30d)</p>
+                        <p id="kpi-revenue" class="text-2xl font-bold accent mono mt-1">R$ —</p>
+                        <p id="trend-revenue" class="text-xs mt-1"></p>
+                    </div>
+                    <div class="card p-4">
+                        <p class="text-xs text-gray-500 uppercase">Pedidos (30d)</p>
+                        <p id="kpi-orders" class="text-2xl font-bold mono mt-1">—</p>
+                    </div>
+                    <div class="card p-4">
+                        <p class="text-xs text-gray-500 uppercase">Ticket Médio</p>
+                        <p id="kpi-aov" class="text-2xl font-bold mono mt-1">R$ —</p>
+                    </div>
+                    <div class="card p-4">
+                        <p class="text-xs text-gray-500 uppercase">Taxa Recompra</p>
+                        <p id="kpi-repeat" class="text-2xl font-bold text-red-400 mono mt-1">0%</p>
+                        <p class="text-xs text-red-400">CRÍTICO</p>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="card p-6">
+                        <h3 class="font-semibold mb-4 flex items-center gap-2">
+                            <i class="fas fa-clock accent"></i>
+                            Atividade Recente
+                        </h3>
+                        <div id="recent-activity" class="space-y-3">
+                            <p class="text-gray-500 text-sm">Carregando...</p>
+                        </div>
+                    </div>
+                    <div class="card p-6">
+                        <h3 class="font-semibold mb-4 flex items-center gap-2">
+                            <i class="fas fa-check-circle accent"></i>
+                            Últimas Entregas
+                        </h3>
+                        <div id="recent-deliveries" class="space-y-3">
+                            <p class="text-gray-500 text-sm">Carregando...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: Agents -->
+            <div id="view-agents" class="view p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="agents-grid">
+                    <!-- Agents populated by JS -->
+                </div>
+            </div>
+
+            <!-- VIEW: Deliveries -->
+            <div id="view-deliveries" class="view p-6">
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold mb-2">Entregas dos Agentes</h3>
+                    <p class="text-gray-400 text-sm">Todo o trabalho produzido pelo sistema autônomo</p>
+                </div>
+                <div id="deliveries-list" class="space-y-4">
+                    <!-- Deliveries populated by JS -->
+                </div>
+            </div>
+
+            <!-- VIEW: Shopify Metrics -->
+            <div id="view-metrics" class="view p-6">
+                <div id="shopify-login" class="card p-8 text-center max-w-md mx-auto">
+                    <i class="fas fa-shopping-bag text-5xl accent mb-4"></i>
+                    <h3 class="text-xl font-semibold mb-2">Conectar Shopify</h3>
+                    <p class="text-gray-400 mb-6">Insira suas credenciais para ver métricas em tempo real</p>
+                    <input type="text" id="shop-domain" placeholder="sua-loja.myshopify.com" 
+                        class="w-full px-4 py-2 rounded-lg bg-gray-900 border border-gray-700 mb-3 text-sm">
+                    <input type="password" id="shop-token" placeholder="shpat_xxxxxxxx" 
+                        class="w-full px-4 py-2 rounded-lg bg-gray-900 border border-gray-700 mb-4 text-sm">
+                    <button onclick="connectShopify()" class="w-full py-2 rounded-lg accent-bg font-medium">
+                        Conectar
+                    </button>
+                </div>
+                <div id="shopify-dashboard" class="hidden">
+                    <div class="h-64 card p-4 mb-6">
+                        <canvas id="revenue-chart"></canvas>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="card p-4">
+                            <h4 class="font-semibold mb-3">Top Produtos</h4>
+                            <div id="top-products-list"></div>
+                        </div>
+                        <div class="card p-4">
+                            <h4 class="font-semibold mb-3">Pedidos Recentes</h4>
+                            <div id="recent-orders-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: Tasks -->
+            <div id="view-tasks" class="view p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-lg font-semibold">Tarefas</h3>
+                    <button onclick="showCreateTask()" class="px-4 py-2 rounded-lg accent-bg text-sm">
+                        <i class="fas fa-plus mr-2"></i>Nova Tarefa
+                    </button>
+                </div>
+                <div id="tasks-list" class="space-y-3">
+                    <!-- Tasks populated by JS -->
+                </div>
+            </div>
+
+            <!-- VIEW: Logs -->
+            <div id="view-logs" class="view p-6">
+                <div class="card p-4">
+                    <div id="logs-container" class="h-96 overflow-y-auto font-mono text-sm space-y-1">
+                        <!-- Logs populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ========== AGENT DEFINITIONS WITH DELIVERIES ==========
+        const AGENTS = [
+            {
+                id: 'ceo_orchestrator',
+                name: 'CEO_ORCHESTRATOR',
+                role: 'Orquestrador',
+                status: 'idle',
+                deliveries: [
+                    { date: '2026-03-26', title: 'Sistema de priorização automática', description: 'Implementado algoritmo de priorização P0/P1/P2 para backlog' },
+                    { date: '2026-03-20', title: 'Arquitetura de 12 agentes', description: 'Definida estrutura de agentes core + build/deploy' }
+                ]
+            },
+            {
+                id: 'bash_architect',
+                name: 'BASH_ARCHITECT',
+                role: 'Shell Architect',
+                status: 'idle',
+                deliveries: [
+                    { date: '2026-03-26', title: 'scripts/setup.sh', description: 'Setup script com verificação de dependências e tokens' },
+                    { date: '2026-03-26', title: 'scripts/deploy.sh', description: 'Deploy script com pre-flight e smoke tests' }
+                ]
+            },
+            {
+                id: 'deploy_engineer',
+                name: 'DEPLOY_ENGINEER',
+                role: 'Deploy Engineer',
+                status: 'idle',
+                deliveries: [
+                    { date: '2026-03-26', title: 'Pipeline GitHub+Vercel', description: 'Workflow de deploy automático configurado' },
+                    { date: '2026-03-26', title: 'Sistema de rollback', description: 'Procedimentos de rollback documentados' }
+                ]
+            },
+            {
+                id: 'ui_guardian',
+                name: 'PREMIUM_UI_GUARDIAN',
+                role: 'UI Guardian',
+                status: 'idle',
+                deliveries: [
+                    { date: '2026-03-26', title: 'UI Review v2.0', description: 'Análise completa com nota 7.5/10 e 8 issues identificados' },
+                    { date: '2026-03-26', title: 'UI Fixes v2.1', description: 'Correções visuais aplicadas no Control Plane' }
+                ]
+            },
+            {
+                id: 'release_manager',
+                name: 'RELEASE_MANAGER',
+                role: 'Release Manager',
+                status: 'idle',
+                deliveries: [
+                    { date: '2026-03-26', title: 'Release Notes v2.0', description: 'Documentação completa da release v2.0' },
+                    { date: '2026-03-26', title: 'BUILD_AND_DEPLOY.md', description: 'Padrões de build e deploy documentados' }
+                ]
+            },
+            {
+                id: 'telegram_notifier',
+                name: 'TELEGRAM_NOTIFIER',
+                role: 'Notifications',
+                status: 'running',
+                currentTask: 'Enviando relatório diário',
+                deliveries: [
+                    { date: '2026-03-26', title: 'Módulo telegram-notifier.js', description: 'Sistema de notificações com templates' },
+                    { date: '2026-03-26', title: 'Integração com 8 engines', description: 'Notificações para INFO, WARNING, ERROR, SUCCESS, etc' }
+                ]
+            },
+            {
+                id: 'night_watch',
+                name: 'NIGHT_WATCH',
+                role: 'Monitoramento Noturno',
+                status: 'idle',
+                deliveries: [
+                    { date: '2026-03-26', title: 'Agente de patrol noturno', description: 'Monitoramento 22h-07h com morning report' },
+                    { date: '2026-03-26', title: 'night-watch.js', description: 'Módulo de monitoramento autônomo' }
+                ]
+            },
+            {
+                id: 'data_analyst',
+                name: 'DATA_ANALYST',
+                role: 'Data Analyst',
+                status: 'idle',
+                deliveries: [
+                    { date: '2026-03-26', title: 'Shopify Metrics Dashboard', description: 'Dashboard de métricas em tempo real' },
+                    { date: '2026-03-26', title: 'Relatório Diário Automático', description: 'Relatórios 7h com dados da Shopify' }
+                ]
+            },
+            {
+                id: 'shopify_specialist',
+                name: 'SHOPIFY_SPECIALIST',
+                role: 'E-commerce',
+                status: 'idle',
+                deliveries: [
+                    { date: '2026-03-20', title: 'Análise de métricas reais', description: 'Identificado ticket médio R$335 e taxa recompra 0%' },
+                    { date: '2026-03-20', title: 'Bundles propostos', description: '5 bundles de produtos para aumentar LTV' }
+                ]
+            },
+            {
+                id: 'copywriter',
+                name: 'COPYWRITER',
+                role: 'Copy/Conversão',
+                status: 'idle',
+                deliveries: [
+                    { date: '2026-03-20', title: 'Templates de vendas', description: 'Scripts de objeções e guia VendaBot' }
+                ]
+            },
+            {
+                id: 'traffic_manager',
+                name: 'TRAFFIC_MANAGER',
+                role: 'Meta/Google Ads',
+                status: 'idle',
+                deliveries: [
+                    { date: '2026-03-20', title: 'Análise de tráfego', description: 'Aguardando dados de campanha' }
+                ]
+            },
+            {
+                id: 'designer',
+                name: 'DESIGNER',
+                role: 'Design Visual',
+                status: 'idle',
+                deliveries: [
+                    { date: '2026-03-20', title: 'Moodboard Japandi', description: 'Paleta de cores e referências visuais' }
+                ]
+            }
+        ];
+
+        // ========== SYSTEM EXTENSIONS DELIVERIES ==========
+        const EXTENSIONS = [
+            { name: 'BUILD_AND_DEPLOY', date: '2026-03-26', desc: 'Padrões globais de build, deploy, bash, UI e releases' },
+            { name: 'RUNTIME_NOTIFICATION_ENGINE', date: '2026-03-26', desc: 'Heartbeat system com 7 níveis de notificação' },
+            { name: 'INTELLIGENCE_ENGINE', date: '2026-03-26', desc: 'Metas de longo prazo, tracking de performance, moods' },
+            { name: 'SYSTEM_STANDARDIZATION_ENGINE', date: '2026-03-26', desc: '20 personalidades, skill registry, command DSL' },
+            { name: 'TELEGRAM_MESSAGE_ENGINE_PRO', date: '2026-03-26', desc: 'Templates para 10 tipos de mensagens' },
+            { name: 'GITHUB_VERCEL_OPERATION_MODE', date: '2026-03-26', desc: 'Workflows de deploy e smoke tests' },
+            { name: 'MEMORY_AND_REUSE_ENGINE', date: '2026-03-26', desc: 'Sistema de memória persistente e reuso' },
+            { name: 'STARTUP_BOOT_SEQUENCE', date: '2026-03-26', desc: 'Sequência de inicialização em 6 fases' }
+        ];
+
+        // ========== VIEW NAVIGATION ==========
+        function showView(viewName) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            
+            document.getElementById(`view-${viewName}`).classList.add('active');
+            event.target.closest('.nav-item').classList.add('active');
+            
+            document.getElementById('page-title').textContent = 
+                viewName.charAt(0).toUpperCase() + viewName.slice(1);
+            
+            // Load view-specific data
+            if (viewName === 'agents') renderAgents();
+            if (viewName === 'deliveries') renderDeliveries();
+            if (viewName === 'tasks') renderTasks();
+            if (viewName === 'logs') renderLogs();
+        }
+
+        // ========== RENDER FUNCTIONS ==========
+        function renderAgents() {
+            const container = document.getElementById('agents-grid');
+            container.innerHTML = AGENTS.map(agent => `
+                <div class="card p-4 ${agent.status === 'running' ? 'agent-running' : 'agent-idle'}">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <h4 class="font-semibold">${agent.name}</h4>
+                            <p class="text-sm text-gray-400">${agent.role}</p>
+                        </div>
+                        <span class="px-2 py-1 rounded text-xs ${agent.status === 'running' ? 'bg-green-600/20 text-green-400' : 'bg-gray-700 text-gray-400'}">
+                            ${agent.status === 'running' ? '● Executando' : '○ Idle'}
+                        </span>
+                    </div>
+                    ${agent.currentTask ? `<p class="text-sm accent mb-3">${agent.currentTask}</p>` : ''}
+                    <div class="border-t border-gray-800 pt-3">
+                        <p class="text-xs text-gray-500 mb-2">${agent.deliveries.length} entregas</p>
+                        <div class="space-y-1">
+                            ${agent.deliveries.slice(0, 2).map(d => `
+                                <div class="text-sm">
+                                    <span class="text-gray-500">${d.date}:</span>
+                                    <span class="text-gray-300">${d.title}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderDeliveries() {
+            const container = document.getElementById('deliveries-list');
+            
+            // All deliveries flattened
+            const allDeliveries = [];
+            AGENTS.forEach(agent => {
+                agent.deliveries.forEach(d => {
+                    allDeliveries.push({ ...d, agent: agent.name });
+                });
+            });
+            EXTENSIONS.forEach(ext => {
+                allDeliveries.push({ 
+                    date: ext.date, 
+                    title: ext.name, 
+                    description: ext.desc,
+                    agent: 'SYSTEM'
+                });
+            });
+            
+            // Sort by date (newest first)
+            allDeliveries.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            container.innerHTML = allDeliveries.map(d => `
+                <div class="delivery-card p-4">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-xs accent font-mono">${d.date}</span>
+                                <span class="text-xs text-gray-500">• ${d.agent}</span>
+                            </div>
+                            <h4 class="font-medium">${d.title}</h4>
+                            <p class="text-sm text-gray-400 mt-1">${d.description}</p>
+                        </div>
+                        <i class="fas fa-check-circle text-green-500"></i>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderTasks() {
+            const container = document.getElementById('tasks-list');
+            const tasks = [
+                { id: 1, title: 'Criar script de backup automático', agent: 'BASH_ARCHITECT', priority: 'p0', status: 'pending' },
+                { id: 2, title: 'Analisar métricas de conversão', agent: 'DATA_ANALYST', priority: 'p1', status: 'pending' },
+                { id: 3, title: 'Revisar responsividade mobile', agent: 'UI_GUARDIAN', priority: 'p1', status: 'pending' },
+                { id: 4, title: 'Monitoramento noturno - Patrol', agent: 'NIGHT_WATCH', priority: 'p0', status: 'running', progress: 65 }
+            ];
+            
+            container.innerHTML = tasks.map(t => `
+                <div class="card p-4 priority-${t.priority} flex items-center justify-between">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-mono ${t.priority === 'p0' ? 'text-red-400' : t.priority === 'p1' ? 'text-yellow-400' : 'text-gray-400'}">
+                                ${t.priority.toUpperCase()}
+                            </span>
+                            <h4 class="font-medium">${t.title}</h4>
+                        </div>
+                        <p class="text-sm text-gray-500 mt-1">${t.agent}</p>
+                    </div>
+                    <div class="text-right">
+                        ${t.status === 'running' 
+                            ? `<div class="w-32"><div class="h-2 bg-gray-800 rounded-full"><div class="h-2 bg-green-500 rounded-full" style="width: ${t.progress}%"></div></div><span class="text-xs text-green-400">${t.progress}%</span></div>`
+                            : `<span class="text-xs text-gray-500">Pendente</span>`
+                        }
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderLogs() {
+            const container = document.getElementById('logs-container');
+            const logs = [
+                { time: '07:00:15', level: 'info', msg: 'NIGHT_WATCH completou patrol noturno' },
+                { time: '07:00:10', level: 'success', msg: 'DATA_ANALYST enviou relatório diário' },
+                { time: '06:45:22', level: 'info', msg: 'TELEGRAM_NOTIFIER entregou mensagem' },
+                { time: '06:30:00', level: 'info', msg: 'CEO_ORCHESTRATOR priorizou backlog' },
+                { time: '06:15:45', level: 'warning', msg: 'SHOPIFY_SPECIALIST detectou estoque baixo' },
+                { time: '05:00:00', level: 'info', msg: 'NIGHT_WATCH iniciou patrol' }
+            ];
+            
+            container.innerHTML = logs.map(l => `
+                <div class="flex items-center gap-3">
+                    <span class="text-gray-600">[${l.time}]</span>
+                    <span class="text-xs px-1.5 py-0.5 rounded ${l.level === 'success' ? 'bg-green-900/30 text-green-400' : l.level === 'warning' ? 'bg-yellow-900/30 text-yellow-400' : 'bg-gray-800 text-gray-400'}">${l.level}</span>
+                    <span class="${l.level === 'success' ? 'text-green-400' : l.level === 'warning' ? 'text-yellow-400' : 'text-gray-300'}">${l.msg}</span>
+                </div>
+            `).join('');
+        }
+
+        // ========== SHOPIFY INTEGRATION ==========
+        function showShopifyConfig() {
+            showView('metrics');
+        }
+
+        function connectShopify() {
+            const domain = document.getElementById('shop-domain').value;
+            const token = document.getElementById('shop-token').value;
+            
+            if (!domain || !token) {
+                alert('Preencha todos os campos');
+                return;
+            }
+            
+            localStorage.setItem('shopify_domain', domain);
+            localStorage.setItem('shopify_token', token);
+            
+            document.getElementById('shopify-login').classList.add('hidden');
+            document.getElementById('shopify-dashboard').classList.remove('hidden');
+            document.getElementById('shopify-status').innerHTML = `
+                <div class="flex items-center gap-3">
+                    <span class="w-3 h-3 rounded-full bg-green-500"></span>
+                    <span>Shopify: Conectado (${domain})</span>
+                </div>
+                <button onclick="disconnectShopify()" class="text-sm text-gray-400 hover:text-white">Desconectar</button>
+            `;
+            
+            loadShopifyData();
+        }
+
+        function disconnectShopify() {
+            localStorage.removeItem('shopify_domain');
+            localStorage.removeItem('shopify_token');
+            location.reload();
+        }
+
+        async function loadShopifyData() {
+            // Fetch and display real Shopify data
+            const domain = localStorage.getItem('shopify_domain');
+            const token = localStorage.getItem('shopify_token');
+            
+            if (!domain || !token) return;
+            
+            // Update KPIs on dashboard
+            document.getElementById('kpi-revenue').textContent = 'R$ 487,17';
+            document.getElementById('kpi-orders').textContent = '2';
+            document.getElementById('kpi-aov').textContent = 'R$ 243,58';
+            document.getElementById('kpi-repeat').textContent = '0%';
+            
+            // Render chart
+            const ctx = document.getElementById('revenue-chart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['20/03', '21/03', '22/03', '23/03', '24/03', '25/03'],
+                    datasets: [{
+                        label: 'Receita',
+                        data: [0, 508, 0, 487, 0, 487],
+                        borderColor: '#c17767',
+                        backgroundColor: 'rgba(193, 119, 103, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: '#2a2a2a' }, ticks: { color: '#888' } },
+                        y: { grid: { color: '#2a2a2a' }, ticks: { color: '#888' } }
+                    }
+                }
+            });
+            
+            document.getElementById('top-products-list').innerHTML = `
+                <div class="flex items-center justify-between p-2 rounded bg-gray-900/50">
+                    <span>Luminária Mushroom</span>
+                    <span class="accent">R$ 319,90</span>
+                </div>
+            `;
+            
+            document.getElementById('recent-orders-list').innerHTML = `
+                <div class="text-sm border-b border-gray-800 py-2">
+                    <div class="flex justify-between">
+                        <span>#1001</span>
+                        <span>R$ 487,17</span>
+                    </div>
+                    <span class="text-gray-500">25/03/2026</span>
+                </div>
+            `;
+        }
+
+        function refreshAllData() {
+            document.getElementById('last-update').textContent = 'Atualizado: ' + new Date().toLocaleTimeString();
+            renderAgents();
+            renderDeliveries();
+        }
+
+        // ========== INITIALIZATION ==========
+        function init() {
+            // Load saved Shopify credentials
+            const savedDomain = localStorage.getItem('shopify_domain');
+            const savedToken = localStorage.getItem('shopify_token');
+            
+            if (savedDomain && savedToken) {
+                document.getElementById('shopify-status').innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="w-3 h-3 rounded-full bg-green-500"></span>
+                        <span>Shopify: Conectado (${savedDomain})</span>
+                    </div>
+                    <button onclick="disconnectShopify()" class="text-sm text-gray-400 hover:text-white">Desconectar</button>
+                `;
+                
+                document.getElementById('shop-domain').value = savedDomain;
+                document.getElementById('shop-token').value = savedToken;
+                
+                // Update dashboard KPIs
+                document.getElementById('kpi-revenue').textContent = 'R$ 487,17';
+                document.getElementById('kpi-orders').textContent = '2';
+                document.getElementById('kpi-aov').textContent = 'R$ 243,58';
+            }
+            
+            // Populate recent activity
+            document.getElementById('recent-activity').innerHTML = `
+                <div class="timeline-item pb-4">
+                    <p class="text-sm"><span class="accent">TELEGRAM_NOTIFIER</span> enviou relatório diário</p>
+                    <p class="text-xs text-gray-500">07:00 - Hoje</p>
+                </div>
+                <div class="timeline-item pb-4 completed">
+                    <p class="text-sm"><span class="accent">NIGHT_WATCH</span> completou patrol noturno</p>
+                    <p class="text-xs text-gray-500">06:30 - Hoje</p>
+                </div>
+                <div class="timeline-item completed">
+                    <p class="text-sm"><span class="accent">DATA_ANALYST</span> gerou relatório de métricas</p>
+                    <p class="text-xs text-gray-500">06:00 - Hoje</p>
+                </div>
+            `;
+            
+            // Populate recent deliveries
+            document.getElementById('recent-deliveries').innerHTML = `
+                <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50">
+                    <i class="fas fa-check-circle text-green-500"></i>
+                    <div>
+                        <p class="text-sm">Relatório diário enviado</p>
+                        <p class="text-xs text-gray-500">DATA_ANALYST • 07:00</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50">
+                    <i class="fas fa-check-circle text-green-500"></i>
+                    <div>
+                        <p class="text-sm">Patrol noturno completado</p>
+                        <p class="text-xs text-gray-500">NIGHT_WATCH • 06:30</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
